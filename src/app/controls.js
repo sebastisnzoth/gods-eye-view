@@ -1,6 +1,5 @@
 import { catalogControlServices } from './catalog.js';
 import { StyleManager } from '../ui/composition.js';
-import { flyToAustin } from '../camera.js';
 import { initCockpitCloudEffects } from '../cockpitCloudEffects.js';
 
 /** Construct the existing controls and camera presentation. */
@@ -39,10 +38,30 @@ export function createApplicationControls({
   });
   defer(() => cockpitCloudEffects?.destroy());
 
-  // If no share link state, do default fly-to Austin
+  // If no share link state, open centered on the requested Quilmes address.
   if (!styleManager.hasShareState) {
-    loaderStatus.textContent = 'Flying to Austin, TX...';
-    defer(flyToAustin(viewer));
+    const startupController = new AbortController();
+    loaderStatus.textContent = 'Flying to Lugones 24, Quilmes...';
+    defer(() => {
+      startupController.abort();
+      if (!viewer.isDestroyed()) viewer.camera.cancelFlight();
+    });
+    void operations
+      .searchAndFlyTo(
+        viewer,
+        'Leopoldo Lugones 24, Quilmes, Buenos Aires, Argentina',
+        {
+          placeSearch,
+          signal: startupController.signal,
+          forceClose: true,
+          range: 220,
+          duration: 4.0,
+        },
+      )
+      .catch((error) => {
+        if (startupController.signal.aborted) return;
+        console.warn('Startup location search failed:', error);
+      });
   } else {
     loaderStatus.textContent = 'Restoring shared view...';
   }
