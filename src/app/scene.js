@@ -12,6 +12,7 @@ import {
 } from '../renderGovernor.js';
 import { describeError } from './errors.js';
 
+// Keyless production starts on OSM so a missing provider credential never leaves a blank globe.
 /** Construct the application globe using the caller's local configuration. */
 export async function createApplicationScene({
   requestServices,
