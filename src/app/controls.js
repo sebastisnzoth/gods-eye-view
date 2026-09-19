@@ -1,5 +1,6 @@
 import { catalogControlServices } from './catalog.js';
 import { StyleManager } from '../ui/composition.js';
+import { flyToLandmark } from '../locations.js';
 import { initCockpitCloudEffects } from '../cockpitCloudEffects.js';
 
 /** Construct the existing controls and camera presentation. */
@@ -49,7 +50,7 @@ export function createApplicationControls({
     void operations
       .searchAndFlyTo(
         viewer,
-        'Leopoldo Lugones 24, Quilmes, Buenos Aires, Argentina',
+        'Lugones 24, Quilmes, Buenos Aires, Argentina',
         {
           placeSearch,
           signal: startupController.signal,
@@ -58,9 +59,28 @@ export function createApplicationControls({
           duration: 4.0,
         },
       )
+      .then((destination) => {
+        if (startupController.signal.aborted || destination) return;
+        loaderStatus.textContent = 'Opening Lugones, Quilmes...';
+        flyToLandmark(viewer, -34.7386093, -58.2435432, {
+          range: 220,
+          pitch: -30,
+          heading: 30,
+          buildingHeight: 8,
+          duration: 4.0,
+        });
+      })
       .catch((error) => {
         if (startupController.signal.aborted) return;
         console.warn('Startup location search failed:', error);
+        loaderStatus.textContent = 'Opening Lugones, Quilmes...';
+        flyToLandmark(viewer, -34.7386093, -58.2435432, {
+          range: 220,
+          pitch: -30,
+          heading: 30,
+          buildingHeight: 8,
+          duration: 4.0,
+        });
       });
   } else {
     loaderStatus.textContent = 'Restoring shared view...';
