@@ -401,18 +401,10 @@ export function createGeminiSession({
           socket.send(
             JSON.stringify({
               setup: {
+                // The ephemeral token contains the effective Live setup.
+                // With an empty fieldMask, Gemini ignores connection-side
+                // configuration and uses bidiGenerateContentSetup from token.
                 model,
-                generationConfig: {
-                  responseModalities: ['AUDIO'],
-                },
-                systemInstruction: {
-                  parts: [
-                    {
-                      text:
-                        "You are the voice interface for God's Eye View. Reply briefly in the user's language.",
-                    },
-                  ],
-                },
               },
             }),
           );
