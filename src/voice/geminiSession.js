@@ -402,15 +402,12 @@ export function createGeminiSession({
             JSON.stringify({
               setup: {
                 model,
-                generationConfig: { responseModalities: ['AUDIO'] },
-                inputAudioTranscription: {},
-                outputAudioTranscription: {},
-                sessionResumption: {},
+                responseModalities: ['AUDIO'],
                 systemInstruction: {
                   parts: [
                     {
                       text:
-                        "You are the voice interface for God's Eye View. Reply briefly in the user's language. Use the available function tools whenever the user asks to move the map, change layers, inspect map data, or perform an interface action. Never claim an action succeeded until its tool response confirms it.",
+                        "You are the voice interface for God's Eye View. Reply briefly in the user's language.",
                     },
                   ],
                 },
