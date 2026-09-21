@@ -79,23 +79,64 @@ function downsamplePcm16(input, inputRate, outputRate = 16000) {
 function waitForSetup(socket, signal, timeoutMs = 15_000) {
   return new Promise((resolve, reject) => {
     let timer;
+    let settled = false;
+
     const cleanup = () => {
       clearTimeout(timer);
-      signal?.removeEventListener('abort', aborted);
+      signal?.removeEventListener('abort', onAbort);
+      socket.removeEventListener?.('message', onMessage);
+      socket.removeEventListener?.('close', onClose);
+      socket.removeEventListener?.('error', onError);
     };
-    const aborted = () => {
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
       cleanup();
-      reject(new DOMException('Voice startup cancelled', 'AbortError'));
+      callback(value);
     };
-    timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('Gemini Live setup timed out'));
-    }, timeoutMs);
-    signal?.addEventListener('abort', aborted, { once: true });
-    socket.__gevSetupComplete = () => {
-      cleanup();
-      resolve();
+    const onAbort = () =>
+      finish(
+        reject,
+        new DOMException('Voice startup cancelled', 'AbortError'),
+      );
+    const onError = () =>
+      finish(reject, new Error('Gemini Live WebSocket connection failed'));
+    const onClose = (event) =>
+      finish(
+        reject,
+        new Error(
+          event?.reason
+            ? `Gemini Live rejected setup: ${event.reason}`
+            : `Gemini Live rejected setup (code ${event?.code || 'unknown'})`,
+        ),
+      );
+    const onMessage = (event) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (message?.setupComplete) finish(resolve);
+      else if (message?.error)
+        finish(
+          reject,
+          new Error(
+            message.error.message ||
+              message.error.status ||
+              'Gemini Live setup failed',
+          ),
+        );
     };
+
+    timer = setTimeout(
+      () => finish(reject, new Error('Gemini Live setup timed out')),
+      timeoutMs,
+    );
+    signal?.addEventListener('abort', onAbort, { once: true });
+    socket.addEventListener?.('message', onMessage);
+    socket.addEventListener?.('close', onClose);
+    socket.addEventListener?.('error', onError);
   });
 }
 
@@ -373,7 +414,6 @@ export function createGeminiSession({
                     },
                   ],
                 },
-                tools: [{ functionDeclarations: functionDeclarations() }],
               },
             }),
           );
