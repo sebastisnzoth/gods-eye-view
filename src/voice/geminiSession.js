@@ -401,10 +401,10 @@ export function createGeminiSession({
           socket.send(
             JSON.stringify({
               setup: {
-                // The ephemeral token contains the effective Live setup.
-                // With an empty fieldMask, Gemini ignores connection-side
-                // configuration and uses bidiGenerateContentSetup from token.
                 model,
+                generationConfig: {
+                  responseModalities: ['AUDIO'],
+                },
               },
             }),
           );
@@ -447,9 +447,12 @@ export function createGeminiSession({
     const startSignal = AbortSignal.any(
       [signal, startAbort.signal].filter(Boolean),
     );
+    emit({ type: 'state', state: 'connecting', detail: 'Gemini: requesting token' });
     const credential = await requestToken(startSignal);
+    emit({ type: 'state', state: 'connecting', detail: 'Gemini: opening Live socket' });
     await openSocket(credential, startSignal);
     setupReady = true;
+    emit({ type: 'state', state: 'connecting', detail: 'Gemini: setup complete, starting microphone' });
     await startMicrophone();
     emit({ type: 'state', state: 'listening', detail: 'Gemini Live ready' });
   }
