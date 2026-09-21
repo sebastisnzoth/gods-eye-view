@@ -402,7 +402,9 @@ export function createGeminiSession({
             JSON.stringify({
               setup: {
                 model,
-                responseModalities: ['AUDIO'],
+                generationConfig: {
+                  responseModalities: ['AUDIO'],
+                },
                 systemInstruction: {
                   parts: [
                     {
