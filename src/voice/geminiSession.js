@@ -321,42 +321,73 @@ export function createGeminiSession({
     if (!WebSocketImpl) throw new Error('WebSocket is unavailable');
     const url = `${GEMINI_WS_ENDPOINT}?access_token=${encodeURIComponent(token)}`;
     socket = new WebSocketImpl(url);
+
+    // Install receive/close handlers before sending setup. Gemini can answer
+    // with setupComplete immediately after the first frame; registering
+    // onmessage afterwards creates a race that turns a successful handshake
+    // into a false 15-second timeout.
     const setup = waitForSetup(socket, startSignal);
+    socket.onmessage = handleMessage;
 
     await new Promise((resolve, reject) => {
-      const aborted = () => reject(new DOMException('Voice startup cancelled', 'AbortError'));
-      startSignal?.addEventListener('abort', aborted, { once: true });
-      socket.onopen = () => {
+      let settled = false;
+      const cleanup = () =>
         startSignal?.removeEventListener('abort', aborted);
-        socket.send(
-          JSON.stringify({
-            setup: {
-              model,
-              generationConfig: { responseModalities: ['AUDIO'] },
-              inputAudioTranscription: {},
-              outputAudioTranscription: {},
-              sessionResumption: {},
-              systemInstruction: {
-                parts: [
-                  {
-                    text:
-                      "You are the voice interface for God's Eye View. Reply briefly in the user's language. Use the available function tools whenever the user asks to move the map, change layers, inspect map data, or perform an interface action. Never claim an action succeeded until its tool response confirms it.",
-                  },
-                ],
-              },
-              tools: [{ functionDeclarations: functionDeclarations() }],
-            },
-          }),
-        );
-        resolve();
+      const fail = (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
       };
-      socket.onerror = () => {
-        startSignal?.removeEventListener('abort', aborted);
-        reject(new Error('Gemini Live WebSocket connection failed'));
+      const aborted = () =>
+        fail(new DOMException('Voice startup cancelled', 'AbortError'));
+
+      startSignal?.addEventListener('abort', aborted, { once: true });
+
+      socket.onerror = () =>
+        fail(new Error('Gemini Live WebSocket connection failed'));
+
+      socket.onclose = (event) => {
+        setupReady = false;
+        const detail = event.reason
+          ? `Gemini Live closed during setup: ${event.reason}`
+          : `Gemini Live closed during setup (code ${event.code || 'unknown'})`;
+        fail(new Error(detail));
+      };
+
+      socket.onopen = () => {
+        try {
+          socket.send(
+            JSON.stringify({
+              setup: {
+                model,
+                generationConfig: { responseModalities: ['AUDIO'] },
+                inputAudioTranscription: {},
+                outputAudioTranscription: {},
+                sessionResumption: {},
+                systemInstruction: {
+                  parts: [
+                    {
+                      text:
+                        "You are the voice interface for God's Eye View. Reply briefly in the user's language. Use the available function tools whenever the user asks to move the map, change layers, inspect map data, or perform an interface action. Never claim an action succeeded until its tool response confirms it.",
+                    },
+                  ],
+                },
+                tools: [{ functionDeclarations: functionDeclarations() }],
+              },
+            }),
+          );
+          settled = true;
+          cleanup();
+          resolve();
+        } catch (error) {
+          fail(error);
+        }
       };
     });
 
-    socket.onmessage = handleMessage;
+    await setup;
+
     socket.onerror = () => {
       if (!intentionalClose)
         emit({
@@ -373,11 +404,9 @@ export function createGeminiSession({
           state: 'error',
           detail: event.reason
             ? `Gemini Live disconnected: ${event.reason}`
-            : 'Gemini Live disconnected',
+            : `Gemini Live disconnected (code ${event.code || 'unknown'})`,
         });
     };
-
-    await setup;
   }
 
   async function start() {
