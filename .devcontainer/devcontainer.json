@@ -1,0 +1,17 @@
+{
+  "name": "God's Eye View Codespace",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "containerEnv": {
+    "PUPPETEER_SKIP_DOWNLOAD": "true"
+  },
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": {
+      "label": "God's Eye View",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "postCreateCommand": "npm ci",
+  "postStartCommand": "nohup npm run dev -- --host 0.0.0.0 > /tmp/gods-eye-view.log 2>&1 &",
+  "remoteUser": "node"
+}
