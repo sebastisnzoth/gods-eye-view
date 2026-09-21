@@ -30,10 +30,71 @@ function toolSchema(value) {
   return result;
 }
 
+const ACTION_DESCRIPTIONS = Object.freeze({
+  fly_to_location:
+    'Fly the globe camera to a city, address, landmark, coordinates or arbitrary place search query.',
+  select_nearest_aircraft:
+    'Select the nearest civilian or military aircraft around a place or coordinates.',
+  adjust_camera_zoom:
+    'Zoom the current camera view in or out by a small, medium or large amount.',
+  zoom_to_globe:
+    'Return the camera to a full-Earth globe view.',
+  set_layer_visibility:
+    'Enable or disable a real God\'s Eye View data layer such as flights, military, earthquakes, satellites, traffic, CCTV, radio, vessels, fires or infrastructure.',
+  show_data_layers_menu:
+    'Open the data-layers interface, optionally focused on a specific layer.',
+  set_panel_open:
+    'Open or close a God\'s Eye View UI panel.',
+  set_context_mode:
+    'Switch the right-side context mode between contacts, space missions or off.',
+  control_cockpit:
+    'Enter, exit or navigate the aircraft/vessel/site cockpit and contact context.',
+  set_visual_style:
+    'Change the globe visual style such as normal, surveillance, thermal, noir or snow.',
+  get_entity_context:
+    'Read structured context about the selected or visible map entities.',
+  get_current_view_state:
+    'Read the current camera, selected entity, layers and relevant visible-map state before reasoning about the scene.',
+  set_hud:
+    'Show, hide or reconfigure the intelligence HUD.',
+  set_detection:
+    'Enable, disable or tune the map detection overlay.',
+  set_map_stack:
+    'Change the basemap or 3D map source stack.',
+  set_post_processing:
+    'Enable or tune bloom and sharpening post-processing.',
+  control_scene:
+    'List, play, stop, advance or inspect saved scene sequences.',
+  control_cctv:
+    'Operate public CCTV cameras: enable, disable, choose, move to nearest, focus, show coverage/viewshed, adjust projection or autohop.',
+  control_radio:
+    'Operate internet radio: enable, select, play, pause, stop, change station/category/location or volume.',
+  track_entity:
+    'Find and start tracking a named or identified map entity.',
+  stop_tracking:
+    'Stop tracking the currently followed map entity.',
+  frame_overhead:
+    'Frame a group of flights, military aircraft, satellites or vessels from overhead.',
+  annotate_map:
+    'Draw persistent or temporary pins, labels, areas, arrows, highlights or routes on the map.',
+  clear_annotations:
+    'Remove map annotations.',
+  move_camera:
+    'Orbit, pan, tilt, rotate or stop continuous camera movement.',
+  fly_route:
+    'Animate/fly an already prepared route on the globe.',
+  analyst_query:
+    'Query loaded geospatial data such as flights, vessels, fires, earthquakes or infrastructure with filters and scope.',
+  next_iss_pass:
+    'Calculate the next ISS pass for coordinates or the current relevant location.',
+});
+
 function functionDeclarations() {
   return GEV_ACTION_SCHEMAS.map(({ name, parameters }) => ({
     name,
-    description: `God's Eye View action: ${name.replaceAll('_', ' ')}`,
+    description:
+      ACTION_DESCRIPTIONS[name] ||
+      `God's Eye View action: ${name.replaceAll('_', ' ')}`,
     parameters: toolSchema(parameters),
   }));
 }
@@ -242,6 +303,15 @@ export function createGeminiSession({
     const calls = Array.isArray(toolCall?.functionCalls)
       ? toolCall.functionCalls
       : [];
+    if (!calls.length) return;
+    emit({
+      type: 'state',
+      state: 'executing',
+      detail:
+        calls.length === 1
+          ? `Gemini: executing ${calls[0].name}`
+          : `Gemini: executing ${calls.length} map actions`,
+    });
     const functionResponses = [];
     for (const call of calls) {
       try {
@@ -261,6 +331,7 @@ export function createGeminiSession({
     }
     if (functionResponses.length)
       send({ toolResponse: { functionResponses } });
+    emit({ type: 'state', state: 'listening', detail: 'Gemini Live ready' });
   }
 
   async function handleMessage(event) {
