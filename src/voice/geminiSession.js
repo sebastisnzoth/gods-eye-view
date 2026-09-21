@@ -76,6 +76,22 @@ function downsamplePcm16(input, inputRate, outputRate = 16000) {
   return new Uint8Array(pcm.buffer);
 }
 
+async function parseSocketJson(data) {
+  try {
+    if (typeof data === 'string') return JSON.parse(data);
+    if (data instanceof Blob) return JSON.parse(await data.text());
+    if (data instanceof ArrayBuffer)
+      return JSON.parse(new TextDecoder().decode(data));
+    if (ArrayBuffer.isView(data))
+      return JSON.parse(
+        new TextDecoder().decode(
+          new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+        ),
+      );
+  } catch {}
+  return null;
+}
+
 function waitForSetup(socket, signal, timeoutMs = 15_000) {
   return new Promise((resolve, reject) => {
     let timer;
@@ -110,15 +126,11 @@ function waitForSetup(socket, signal, timeoutMs = 15_000) {
             : `Gemini Live rejected setup (code ${event?.code || 'unknown'})`,
         ),
       );
-    const onMessage = (event) => {
-      let message;
-      try {
-        message = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (message?.setupComplete) finish(resolve);
-      else if (message?.error)
+    const onMessage = async (event) => {
+      const message = await parseSocketJson(event.data);
+      if (!message) return;
+      if (message.setupComplete) finish(resolve);
+      else if (message.error)
         finish(
           reject,
           new Error(
@@ -251,13 +263,9 @@ export function createGeminiSession({
       send({ toolResponse: { functionResponses } });
   }
 
-  function handleMessage(event) {
-    let message;
-    try {
-      message = JSON.parse(event.data);
-    } catch {
-      return;
-    }
+  async function handleMessage(event) {
+    const message = await parseSocketJson(event.data);
+    if (!message) return;
 
     if (message.setupComplete) {
       socket?.__gevSetupComplete?.();
