@@ -43,10 +43,27 @@ export default async function handler(req, res) {
 
   const model = resolveModel();
   const now = Date.now();
+  const modelResource = model.startsWith('models/')
+    ? model
+    : `models/${model}`;
   const body = {
     uses: 1,
     expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
     newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
+    bidiGenerateContentSetup: {
+      model: modelResource,
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+      },
+      systemInstruction: {
+        parts: [
+          {
+            text:
+              "You are the voice interface for God's Eye View. Reply briefly in the user's language.",
+          },
+        ],
+      },
+    },
   };
 
   try {
