@@ -47,9 +47,6 @@ export default async function handler(req, res) {
     uses: 1,
     expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
     newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-    liveConnectConstraints: {
-      model: model.startsWith('models/') ? model : `models/${model}`,
-    },
   };
 
   try {
